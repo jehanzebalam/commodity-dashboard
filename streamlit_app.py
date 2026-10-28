@@ -132,21 +132,27 @@ except Exception as error:
     with st.expander("Connection details"):
         st.text(str(error))
 
+selection = st.selectbox("Price series", list(SERIES), key="cocoa_price_series")
+name, symbol, unit = SERIES[selection]
+values = prices[name].dropna() if prices is not None else pd.Series(dtype=float)
+
 commodities = [
-    "Cocoa — ICCO daily benchmark", "Raw sugar futures", "White sugar futures",
+    f"Cocoa — {selection}", "Raw sugar futures", "White sugar futures",
     "Crude palm oil futures", "GDT Whole Milk Powder", "GDT Skim Milk Powder",
 ]
 for start in range(0, len(commodities), 3):
     columns = st.columns(3)
     for column, commodity in zip(columns, commodities[start:start + 3]):
         with column:
-            if commodity == commodities[0] and prices is not None:
-                benchmark = prices[BENCHMARK].dropna()
-                latest = float(benchmark.iloc[-1])
-                previous = float(benchmark.iloc[-2])
-                change = (latest / previous - 1) * 100
-                st.metric(commodity, f"$" + f"{latest:,.2f}/tonne", f"{change:+.2f}%", delta_color="inverse")
-                st.caption(f"Observation: {benchmark.index[-1]:%d %b %Y}")
+            if commodity == commodities[0] and not values.empty:
+                latest = float(values.iloc[-1])
+                delta = None
+                if len(values) >= 2:
+                    previous = float(values.iloc[-2])
+                    change = (latest / previous - 1) * 100
+                    delta = f"{change:+.2f}%"
+                st.metric(commodity, f"{symbol}{latest:,.2f}/tonne", delta, delta_color="inverse")
+                st.caption(f"Observation: {values.index[-1]:%d %b %Y}")
             else:
                 st.metric(commodity, "—")
                 st.caption("Awaiting data" if commodity == commodities[0] else "Not connected yet")
@@ -154,12 +160,9 @@ for start in range(0, len(commodities), 3):
 st.divider()
 st.subheader("Cocoa price trend")
 st.markdown(f"Source: [International Cocoa Organization (ICCO)]({SOURCE_URL})")
-st.caption("The headline price is ICCO's cocoa bean benchmark, combining the nearest three active futures months in London and New York. It is not a cocoa powder price.")
+st.caption("The cocoa card and chart show the selected price series. ICCO's daily benchmark combines the nearest three active futures months in London and New York. These are cocoa bean prices, not cocoa powder prices.")
 
 if prices is not None:
-    selection = st.selectbox("Price series", list(SERIES))
-    name, symbol, unit = SERIES[selection]
-    values = prices[name].dropna()
     if values.empty:
         st.info("No valid observations were returned for this series.")
     else:
